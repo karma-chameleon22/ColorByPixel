@@ -36,6 +36,7 @@
         let maxClicks = 30;
         let clicks = 0;
         let revealAmount = 1; // Default number of blocks to reveal per click
+        let revealClusterSize = 5; // Default size of the reveal cluster
 
         // Adjust canvas size based on window size
         canvas.width = window.innerWidth - 40;
@@ -46,12 +47,15 @@
             if (level === 'easy') {
                 revealAmount = 5; // Reveal 5 blocks per click in easy mode
                 maxClicks = 40;
+                revealClusterSize = 10; // Larger cluster size in easy mode
             } else if (level === 'medium') {
                 revealAmount = 3; // Reveal 3 blocks per click in medium mode
                 maxClicks = 30;
+                revealClusterSize = 7; // Medium cluster size
             } else if (level === 'hard') {
                 revealAmount = 1; // Reveal 1 block per click in hard mode
                 maxClicks = 20;
+                revealClusterSize = 3; // Smaller cluster size in hard mode
             }
             resetGame();
         }
@@ -95,63 +99,33 @@
                     ctx.fillRect(x, y, gridSize, gridSize);
                     ctx.strokeStyle = "black";
                     ctx.strokeRect(x, y, gridSize, gridSize);
-                    
-                    // When a pixel is clicked, reveal the color
-                    canvas.addEventListener("click", (event) => {
-                        if (clicks >= maxClicks) return;
-
-                        const rect = canvas.getBoundingClientRect();
-                        const clickX = event.clientX - rect.left;
-                        const clickY = event.clientY - rect.top;
-                        const gridX = Math.floor(clickX / gridSize) * gridSize;
-                        const gridY = Math.floor(clickY / gridSize) * gridSize;
-
-                        // Only reveal if the pixel hasn't already been revealed
-                        if (!revealed.has(`${gridX},${gridY}`)) {
-                            revealed.add(`${gridX},${gridY}`);
-                            const pixelIndex = (gridY * canvas.width + gridX) * 4;
-                            const color = `rgb(${imageData.data[pixelIndex]}, ${imageData.data[pixelIndex + 1]}, ${imageData.data[pixelIndex + 2]})`;
-                            ctx.fillStyle = color;
-                            ctx.fillRect(gridX, gridY, gridSize, gridSize);
-
-                            clicks++;
-                            clicksDisplay.textContent = clicks;
-
-                            // Reveal more blocks based on difficulty
-                            if (revealed.size < canvas.width * canvas.height / (gridSize * gridSize)) {
-                                revealMoreBlocks(imageData);
-                            }
-
-                            // Check if the player has revealed enough pixels to guess
-                            if (revealed.size >= Math.floor((canvas.width * canvas.height) / (gridSize * gridSize) / 2)) {
-                                messageDisplay.textContent = "You guessed the image!";
-                            }
-
-                            // If max clicks are reached, show the full image
-                            if (clicks >= maxClicks) {
-                                messageDisplay.textContent = "Time's up! Here's the full image:";
-                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            }
-                        }
-                    });
                 }
             }
         }
 
-        // Reveal more blocks per click based on difficulty
-        function revealMoreBlocks(imageData) {
+        // Reveal clumped blocks
+        function revealClumpedBlocks(imageData) {
             let revealedCount = 0;
             while (revealedCount < revealAmount && revealed.size < canvas.width * canvas.height / (gridSize * gridSize)) {
-                const randX = Math.floor(Math.random() * Math.floor(canvas.width / gridSize)) * gridSize;
-                const randY = Math.floor(Math.random() * Math.floor(canvas.height / gridSize)) * gridSize;
+                // Generate random starting point for the cluster
+                const startX = Math.floor(Math.random() * Math.floor(canvas.width / gridSize)) * gridSize;
+                const startY = Math.floor(Math.random() * Math.floor(canvas.height / gridSize)) * gridSize;
 
-                if (!revealed.has(`${randX},${randY}`)) {
-                    revealed.add(`${randX},${randY}`);
-                    const pixelIndex = (randY * canvas.width + randX) * 4;
-                    const color = `rgb(${imageData.data[pixelIndex]}, ${imageData.data[pixelIndex + 1]}, ${imageData.data[pixelIndex + 2]})`;
-                    ctx.fillStyle = color;
-                    ctx.fillRect(randX, randY, gridSize, gridSize);
-                    revealedCount++;
+                for (let i = 0; i < revealClusterSize && revealedCount < revealAmount; i++) {
+                    let xOffset = (i % Math.sqrt(revealClusterSize)) * gridSize;
+                    let yOffset = Math.floor(i / Math.sqrt(revealClusterSize)) * gridSize;
+
+                    const x = startX + xOffset;
+                    const y = startY + yOffset;
+
+                    if (x < canvas.width && y < canvas.height && !revealed.has(`${x},${y}`)) {
+                        revealed.add(`${x},${y}`);
+                        const pixelIndex = (y * canvas.width + x) * 4;
+                        const color = `rgb(${imageData.data[pixelIndex]}, ${imageData.data[pixelIndex + 1]}, ${imageData.data[pixelIndex + 2]})`;
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x, y, gridSize, gridSize);
+                        revealedCount++;
+                    }
                 }
             }
         }
@@ -168,6 +142,33 @@
                 createPixelGrid();
             }
         }
+
+        // Handle pixel reveal on click
+        canvas.addEventListener("click", (event) => {
+            if (clicks >= maxClicks) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            // Only reveal more blocks if we haven't reached the max clicks
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            revealClumpedBlocks(imageData);
+
+            clicks++;
+            clicksDisplay.textContent = clicks;
+
+            // Check if the player has revealed enough pixels to guess
+            if (revealed.size >= Math.floor((canvas.width * canvas.height) / (gridSize * gridSize) / 2)) {
+                messageDisplay.textContent = "You guessed the image!";
+            }
+
+            // If max clicks are reached, show the full image
+            if (clicks >= maxClicks) {
+                messageDisplay.textContent = "Game Over! Here's the full image:";
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            }
+        });
     </script>
 </body>
 </html>

@@ -21,4 +21,129 @@
         <button onclick="setDifficulty('hard')">Hard</button>
     </div>
     <canvas id="gameCanvas"></canvas>
-    <div class="message" id="message"></
+    <div class="message" id="message"></div>
+    <div>Clicks: <span id="clicks">0</span></div>
+    
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const uploadBtn = document.getElementById("uploadBtn");
+        const clicksDisplay = document.getElementById("clicks");
+        const messageDisplay = document.getElementById("message");
+        let img = new Image();
+        let imgLoaded = false;
+        let gridSize = 20; // Default to medium
+        let maxClicks = 30;
+        let clicks = 0;
+
+        // Adjust canvas size based on window size
+        canvas.width = window.innerWidth - 40;
+        canvas.height = window.innerHeight - 100;
+
+        // Difficulty levels
+        function setDifficulty(level) {
+            if (level === 'easy') {
+                gridSize = 15;
+                maxClicks = 40;
+            } else if (level === 'medium') {
+                gridSize = 20;
+                maxClicks = 30;
+            } else if (level === 'hard') {
+                gridSize = 30;
+                maxClicks = 20;
+            }
+            resetGame();
+        }
+
+        // Handle image upload
+        uploadBtn.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // When an image is loaded, draw it on canvas and create the pixel grid
+        img.onload = function () {
+            if (!imgLoaded) {
+                imgLoaded = true;
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                createPixelGrid();
+            }
+        };
+
+        // Set to track revealed pixels
+        let revealed = new Set();
+
+        // Create the pixel grid based on the image
+        function createPixelGrid() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                for (let x = 0; x < canvas.width; x += gridSize) {
+                    const index = (y * canvas.width + x) * 4;
+                    const color = `rgb(${imageData.data[index]}, ${imageData.data[index + 1]}, ${imageData.data[index + 2]})`;
+                    ctx.fillStyle = "gray"; // Initial gray color for pixel
+                    ctx.fillRect(x, y, gridSize, gridSize);
+                    ctx.strokeStyle = "black";
+                    ctx.strokeRect(x, y, gridSize, gridSize);
+                    
+                    // When a pixel is clicked, reveal the color
+                    canvas.addEventListener("click", (event) => {
+                        if (clicks >= maxClicks) return;
+                        
+                        const rect = canvas.getBoundingClientRect();
+                        const clickX = event.clientX - rect.left;
+                        const clickY = event.clientY - rect.top;
+                        const gridX = Math.floor(clickX / gridSize) * gridSize;
+                        const gridY = Math.floor(clickY / gridSize) * gridSize;
+
+                        // Only reveal if the pixel hasn't already been revealed
+                        if (!revealed.has(`${gridX},${gridY}`)) {
+                            revealed.add(`${gridX},${gridY}`);
+                            const pixelIndex = (gridY * canvas.width + gridX) * 4;
+                            const color = `rgb(${imageData.data[pixelIndex]}, ${imageData.data[pixelIndex + 1]}, ${imageData.data[pixelIndex + 2]})`;
+                            ctx.fillStyle = color;
+                            ctx.fillRect(gridX, gridY, gridSize, gridSize);
+
+                            clicks++;
+                            clicksDisplay.textContent = clicks;
+
+                            // Check if the player has revealed enough pixels to guess
+                            if (revealed.size >= Math.floor((canvas.width * canvas.height) / (gridSize * gridSize) / 2)) {
+                                messageDisplay.textContent = "You guessed the image!";
+                            }
+
+                            // If max clicks are reached, show the full image
+                            if (clicks >= maxClicks) {
+                                messageDisplay.textContent = "Time's up! Here's the full image:";
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        // Reset game state
+        function resetGame() {
+            revealed.clear();
+            clicks = 0;
+            clicksDisplay.textContent = clicks;
+            messageDisplay.textContent = '';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (imgLoaded) {
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                createPixelGrid();
+            }
+        }
+    </script>
+</body>
+</html>

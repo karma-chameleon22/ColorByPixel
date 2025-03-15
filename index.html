@@ -5,59 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Color by Pixel</title>
     <style>
-        body { text-align: center; }
+        body { text-align: center; margin: 0; padding: 0; }
         canvas { border: 1px solid black; cursor: pointer; }
+        #uploadBtn { margin: 20px; }
     </style>
 </head>
 <body>
     <h1>Color by Pixel</h1>
+    <input type="file" id="uploadBtn" accept="image/*">
     <canvas id="gameCanvas"></canvas>
+    
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-        const gridSize = 16; // Number of pixels per grid cell
-        const img = new Image();
-        img.src = "https://via.placeholder.com/256"; // Replace with any image URL
+        const gridSize = 10; // Number of pixels per grid cell (adjust for larger or smaller cells)
+        let img = new Image();
+        let imgLoaded = false;
 
+        // Adjust canvas size based on window size
+        canvas.width = window.innerWidth - 40; // Give some margin for padding
+        canvas.height = window.innerHeight - 100; // Adjust for header and button
+
+        // When an image is loaded, draw it on canvas and create the pixel grid
         img.onload = function () {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            createPixelGrid();
+            if (!imgLoaded) {
+                imgLoaded = true;
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                createPixelGrid();
+            }
         };
 
-        let revealed = new Set();
-
-        function createPixelGrid() {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let y = 0; y < canvas.height; y += gridSize) {
-                for (let x = 0; x < canvas.width; x += gridSize) {
-                    const index = (y * canvas.width + x) * 4;
-                    const [r, g, b] = imageData.data.slice(index, index + 3);
-                    ctx.fillStyle = "gray";
-                    ctx.fillRect(x, y, gridSize, gridSize);
-                    ctx.strokeRect(x, y, gridSize, gridSize);
-                }
-            }
-        }
-
-        canvas.addEventListener("click", function (event) {
-            const rect = canvas.getBoundingClientRect();
-            const x = Math.floor((event.clientX - rect.left) / gridSize) * gridSize;
-            const y = Math.floor((event.clientY - rect.top) / gridSize) * gridSize;
-            
-            if (!revealed.has(`${x},${y}`)) {
-                revealPixel(x, y);
-                revealed.add(`${x},${y}`);
+        // Handle file upload
+        document.getElementById('uploadBtn').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
             }
         });
 
-        function revealPixel(x, y) {
-            const imageData = ctx.getImageData(x, y, 1, 1).data;
-            const [r, g, b] = imageData;
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.fillRect(x, y, gridSize, gridSize);
+        // Set to track revealed pixels
+        let revealed = new Set();
+
+        // Create the pixel grid based on the image
+        function createPixelGrid() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                for (let x = 0; x < canvas.width; x += gridSize) {
+                    const index = (y * canvas.width + x) * 4;
+                    const color = `rgb(${imageData.data[index]}, ${imageData.data[index + 1]}, ${imageData.data[index + 2]})`;
+                    ctx.fillStyle = "gray"; // Initial gray color for pixel
+                    ctx.fillRect(x, y, gridSize, gridSize);
+                    ctx.strokeStyle = "black";
+                    ctx.strokeRect(x, y, gridSize, gridSize);
+                    
+                    // When a pixel is clicked, reveal the color
+                    canvas.addEventListener("click", (event) => {
+                        const rect = canvas.getBoundingClientRect();
+                        const clickX = event.clientX - rect.left;
+                        const clickY = event.clientY - rect.top;
+                        const gridX = Math.floor(clickX / gridSize) * gridSize;
+                        const gridY = Math.floor(clickY / gridSize) * gridSize;
+
+                        // Only reveal if the pixel hasn't already been revealed
+                        if (!revealed.has(`${gridX},${gridY}`)) {
+                            revealed.add(`${gridX},${gridY}`);
+                            const pixelIndex = (gridY * canvas.width + gridX) * 4;
+                            const color = `rgb(${imageData.data[pixelIndex]}, ${imageData.data[pixelIndex + 1]}, ${imageData.data[pixelIndex + 2]})`;
+                            ctx.fillStyle = color;
+                            ctx.fillRect(gridX, gridY, gridSize, gridSize);
+                        }
+                    });
+                }
+            }
         }
     </script>
 </body>

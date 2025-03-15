@@ -35,6 +35,7 @@
         let gridSize = 20; // Default to medium
         let maxClicks = 30;
         let clicks = 0;
+        let revealAmount = 1; // Default number of blocks to reveal per click
 
         // Adjust canvas size based on window size
         canvas.width = window.innerWidth - 40;
@@ -43,13 +44,13 @@
         // Difficulty levels
         function setDifficulty(level) {
             if (level === 'easy') {
-                gridSize = 15;
+                revealAmount = 5; // Reveal 5 blocks per click in easy mode
                 maxClicks = 40;
             } else if (level === 'medium') {
-                gridSize = 20;
+                revealAmount = 3; // Reveal 3 blocks per click in medium mode
                 maxClicks = 30;
             } else if (level === 'hard') {
-                gridSize = 30;
+                revealAmount = 1; // Reveal 1 block per click in hard mode
                 maxClicks = 20;
             }
             resetGame();
@@ -98,7 +99,7 @@
                     // When a pixel is clicked, reveal the color
                     canvas.addEventListener("click", (event) => {
                         if (clicks >= maxClicks) return;
-                        
+
                         const rect = canvas.getBoundingClientRect();
                         const clickX = event.clientX - rect.left;
                         const clickY = event.clientY - rect.top;
@@ -116,6 +117,11 @@
                             clicks++;
                             clicksDisplay.textContent = clicks;
 
+                            // Reveal more blocks based on difficulty
+                            if (revealed.size < canvas.width * canvas.height / (gridSize * gridSize)) {
+                                revealMoreBlocks(imageData);
+                            }
+
                             // Check if the player has revealed enough pixels to guess
                             if (revealed.size >= Math.floor((canvas.width * canvas.height) / (gridSize * gridSize) / 2)) {
                                 messageDisplay.textContent = "You guessed the image!";
@@ -128,6 +134,24 @@
                             }
                         }
                     });
+                }
+            }
+        }
+
+        // Reveal more blocks per click based on difficulty
+        function revealMoreBlocks(imageData) {
+            let revealedCount = 0;
+            while (revealedCount < revealAmount && revealed.size < canvas.width * canvas.height / (gridSize * gridSize)) {
+                const randX = Math.floor(Math.random() * Math.floor(canvas.width / gridSize)) * gridSize;
+                const randY = Math.floor(Math.random() * Math.floor(canvas.height / gridSize)) * gridSize;
+
+                if (!revealed.has(`${randX},${randY}`)) {
+                    revealed.add(`${randX},${randY}`);
+                    const pixelIndex = (randY * canvas.width + randX) * 4;
+                    const color = `rgb(${imageData.data[pixelIndex]}, ${imageData.data[pixelIndex + 1]}, ${imageData.data[pixelIndex + 2]})`;
+                    ctx.fillStyle = color;
+                    ctx.fillRect(randX, randY, gridSize, gridSize);
+                    revealedCount++;
                 }
             }
         }
